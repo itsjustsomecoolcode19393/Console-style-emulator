@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PixelVault — Handheld Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --surface: #1e1e2e;
+    --surface2: #252535;
+    --border: rgba(255,255,255,0.06);
+    --border2: rgba(255,255,255,0.12);
+    --text: #f0f0fa;
+    --text2: #8888aa;
+    --text3: #555568;
+    --accent-gb: #7c3aed;
+    --accent-gbc: #059669;
+    --accent-gba: #dc2626;
+    --accent-gb-dim: rgba(124,58,237,0.15);
+    --accent-gbc-dim: rgba(5,150,105,0.15);
+    --accent-gba-dim: rgba(220,38,38,0.15);
+    --highlight: #a78bfa;
+    --card-w: 180px;
+    --card-h: 230px;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    overflow: hidden;
+  }
+
+  /* ── Background atmosphere ── */
+  .bg-glow {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+  .bg-glow::before {
+    content: '';
+    position: absolute;
+    top: -20%; left: 20%;
+    width: 60vw; height: 60vh;
+    background: radial-gradient(ellipse, rgba(124,58,237,0.08) 0%, transparent 70%);
+    animation: driftA 12s ease-in-out infinite alternate;
+  }
+  .bg-glow::after {
+    content: '';
+    position: absolute;
+    bottom: -10%; right: 10%;
+    width: 50vw; height: 50vh;
+    background: radial-gradient(ellipse, rgba(5,150,105,0.06) 0%, transparent 70%);
+    animation: driftB 15s ease-in-out infinite alternate;
+  }
+  @keyframes driftA { from { transform: translate(0,0); } to { transform: translate(-40px, 30px); } }
+  @keyframes driftB { from { transform: translate(0,0); } to { transform: translate(30px, -40px); } }
+
+  /* ── Layout shells ── */
+  #home-screen {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; flex-direction: column;
+    transition: opacity 0.5s, transform 0.5s;
+  }
+  #emulator-screen {
+    position: fixed; inset: 0; z-index: 20;
+    background: #000;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s;
+  }
+  #emulator-screen.active { opacity: 1; pointer-events: all; }
+  #home-screen.hidden { opacity: 0; pointer-events: none; transform: scale(0.97); }
+
+  /* ── Top bar ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 40px 0;
+    flex-shrink: 0;
+  }
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px; font-weight: 700;
+    letter-spacing: 0.1em;
+    color: var(--text);
+  }
+  .logo span { color: var(--highlight); }
+  .topbar-right {
+    display: flex; align-items: center; gap: 24px;
+  }
+  .clock {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px; color: var(--text2);
+    letter-spacing: 0.05em;
+  }
+  .topbar-badge {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px; color: var(--text2);
+  }
+
+  /* ── System tabs ── */
+  .system-tabs {
+    display: flex; gap: 8px;
+    padding: 28px 40px 0;
+    flex-shrink: 0;
+  }
+  .sys-tab {
+    padding: 8px 22px;
+    border-radius: 100px;
+    border: 1px solid var(--border2);
+    background: transparent;
+    font-family: 'Outfit', sans-serif;
+    font-size: 13px; font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+  .sys-tab:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .sys-tab.active-gb  { background: var(--accent-gb-dim);  color: #c4b5fd; border-color: var(--accent-gb); }
+  .sys-tab.active-gbc { background: var(--accent-gbc-dim); color: #6ee7b7; border-color: var(--accent-gbc); }
+  .sys-tab.active-gba { background: var(--accent-gba-dim); color: #fca5a5; border-color: var(--accent-gba); }
+
+  /* ── Hero featured game ── */
+  .hero {
+    display: flex; align-items: flex-end; gap: 40px;
+    padding: 32px 40px 20px;
+    flex-shrink: 0;
+  }
+  .hero-art {
+    width: 140px; height: 140px;
+    border-radius: 20px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 64px;
+    animation: heroFloat 4s ease-in-out infinite;
+  }
+  @keyframes heroFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+  .hero-info { flex: 1; }
+  .hero-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.12em;
+    color: var(--text3); text-transform: uppercase; margin-bottom: 8px;
+  }
+  .hero-title {
+    font-size: 36px; font-weight: 700; line-height: 1.1;
+    margin-bottom: 10px;
+  }
+  .hero-subtitle { font-size: 14px; color: var(--text2); margin-bottom: 20px; }
+  .hero-actions { display: flex; gap: 10px; }
+  .btn-play {
+    padding: 10px 28px;
+    border-radius: 100px;
+    border: none;
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-play.primary {
+    background: var(--highlight);
+    color: #0a0a1a;
+  }
+  .btn-play.primary:hover { background: #c4b5fd; transform: scale(1.04); }
+  .btn-play.secondary {
+    background: var(--surface2);
+    color: var(--text2);
+    border: 1px solid var(--border2);
+  }
+  .btn-play.secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.25); }
+
+  /* ── Divider ── */
+  .section-label {
+    padding: 0 40px;
+    font-size: 12px; font-weight: 600; letter-spacing: 0.1em;
+    color: var(--text3); text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  /* ── Games shelf ── */
+  .shelf-wrap {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+  .shelf {
+    display: flex; gap: 16px;
+    padding: 0 40px 32px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    scroll-behavior: smooth;
+    height: 100%;
+    align-items: flex-start;
+  }
+  .shelf::-webkit-scrollbar { display: none; }
+
+  /* ── Game card ── */
+  .game-card {
+    flex-shrink: 0;
+    width: var(--card-w);
+    cursor: pointer;
+    transition: transform 0.25s;
+    animation: cardIn 0.4s ease both;
+  }
+  .game-card:hover { transform: translateY(-8px) scale(1.02); }
+  .game-card:focus-visible { outline: 2px solid var(--highlight); border-radius: 16px; }
+  @keyframes cardIn {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .card-art {
+    width: 100%; height: var(--card-h);
+    border-radius: 16px;
+    border: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 56px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s;
+    margin-bottom: 12px;
+  }
+  .game-card:hover .card-art { border-color: rgba(255,255,255,0.25); }
+  .card-art::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(to bottom, transparent 40%, rgba(0,0,0,0.6));
+  }
+  .card-badge {
+    position: absolute; top: 10px; left: 10px;
+    font-size: 9px; font-weight: 700; letter-spacing: 0.1em;
+    padding: 3px 8px; border-radius: 100px;
+    text-transform: uppercase; z-index: 1;
+  }
+  .badge-gb  { background: var(--accent-gb);  color: #fff; }
+  .badge-gbc { background: var(--accent-gbc); color: #fff; }
+  .badge-gba { background: var(--accent-gba); color: #fff; }
+  .card-bottom {
+    position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1;
+  }
+  .card-title { font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3; }
+  .card-meta  { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+
+  /* ── Game card color themes ── */
+  .theme-red    { background: linear-gradient(135deg, #1a0808, #3d0f0f); }
+  .theme-blue   { background: linear-gradient(135deg, #080c1a, #0f1a3d); }
+  .theme-green  { background: linear-gradient(135deg, #081a0c, #0f3d18); }
+  .theme-gold   { background: linear-gradient(135deg, #1a1408, #3d2e0f); }
+  .theme-purple { background: linear-gradient(135deg, #110a1a, #29103d); }
+  .theme-teal   { background: linear-gradient(135deg, #081a18, #0f3d38); }
+  .theme-pink   { background: linear-gradient(135deg, #1a0814, #3d0f2e); }
+  .theme-dark   { background: linear-gradient(135deg, #0f0f14, #1a1a24); }
+
+  /* ── Upload zone ── */
+  .upload-card {
+    flex-shrink: 0;
+    width: var(--card-w);
+  }
+  .upload-zone {
+    width: 100%; height: var(--card-h);
+    border-radius: 16px;
+    border: 2px dashed var(--border2);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 12px;
+    color: var(--text3);
+  }
+  .upload-zone:hover {
+    border-color: var(--highlight);
+    color: var(--highlight);
+    background: rgba(167,139,250,0.05);
+  }
+  .upload-zone svg { width: 32px; height: 32px; }
+  .upload-zone-label { font-size: 12px; font-weight: 600; letter-spacing: 0.05em; }
+  .upload-zone-sub { font-size: 11px; text-align: center; line-height: 1.4; color: var(--text3); }
+
+  /* ── Bottom nav dots ── */
+  .bottom-nav {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 8px 16px;
+    z-index: 50;
+  }
+  .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border2); cursor: pointer; transition: all 0.2s; }
+  .nav-dot.active { width: 20px; border-radius: 3px; background: var(--highlight); }
+
+  /* ── Emulator UI ── */
+  #emulator-screen {
+    background: #000;
+  }
+  .emu-topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 24px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+    z-index: 10;
+  }
+  .emu-back {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px; font-weight: 500; color: rgba(255,255,255,0.7);
+    cursor: pointer; transition: color 0.2s;
+    background: none; border: none; font-family: 'Outfit', sans-serif;
+  }
+  .emu-back:hover { color: #fff; }
+  .emu-game-name { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); }
+  .emu-status {
+    font-size: 12px; color: rgba(255,255,255,0.4);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .emu-container {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #emulator { width: 100%; height: 100%; }
+
+  /* ── Upload screen ── */
+  #upload-screen {
+    position: fixed; inset: 0; z-index: 30;
+    background: rgba(0,0,0,0.85);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+    backdrop-filter: blur(8px);
+  }
+  #upload-screen.active { opacity: 1; pointer-events: all; }
+  .upload-modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 24px;
+    padding: 40px;
+    width: 420px;
+    text-align: center;
+  }
+  .upload-modal h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .upload-modal p  { font-size: 14px; color: var(--text2); margin-bottom: 28px; line-height: 1.6; }
+  .upload-drop {
+    border: 2px dashed var(--border2);
+    border-radius: 16px;
+    padding: 40px 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 20px;
+  }
+  .upload-drop:hover, .upload-drop.drag { border-color: var(--highlight); background: rgba(167,139,250,0.05); }
+  .upload-drop-icon { font-size: 40px; margin-bottom: 12px; }
+  .upload-drop-text { font-size: 15px; font-weight: 600; margin-bottom: 6px; }
+  .upload-drop-sub  { font-size: 13px; color: var(--text2); }
+  .upload-dismiss {
+    background: none; border: 1px solid var(--border2);
+    color: var(--text2); font-family: 'Outfit', sans-serif;
+    font-size: 14px; padding: 10px 24px; border-radius: 100px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .upload-dismiss:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  #file-input { display: none; }
+</style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<!-- ══════════ HOME SCREEN ══════════ -->
+<div id="home-screen">
+
+  <div class="topbar">
+    <div class="logo">PIXEL<span>VAULT</span></div>
+    <div class="topbar-right">
+      <div class="clock" id="clock">00:00</div>
+      <div class="topbar-badge">3 Systems</div>
+    </div>
+  </div>
+
+  <div class="system-tabs">
+    <button class="sys-tab active-gb"  onclick="filterSystem('all')" data-filter="all">All Games</button>
+    <button class="sys-tab" onclick="filterSystem('GB')"  data-filter="GB">Game Boy</button>
+    <button class="sys-tab" onclick="filterSystem('GBC')" data-filter="GBC">Game Boy Color</button>
+    <button class="sys-tab" onclick="filterSystem('GBA')" data-filter="GBA">Game Boy Advance</button>
+  </div>
+
+  <!-- Hero -->
+  <div class="hero" id="hero-section">
+    <div class="hero-art theme-red" id="hero-art">🎮</div>
+    <div class="hero-info">
+      <div class="hero-label" id="hero-label">Featured · Game Boy</div>
+      <div class="hero-title" id="hero-title">Your Library</div>
+      <div class="hero-subtitle" id="hero-subtitle">Upload a ROM to get started. Supports .gb, .gbc, and .gba files.</div>
+      <div class="hero-actions">
+        <button class="btn-play primary" id="hero-play" onclick="heroPlay()">▶ Play Now</button>
+        <button class="btn-play secondary" onclick="openUpload()">+ Add ROM</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label" id="shelf-label">Recently Added</div>
+
+  <div class="shelf-wrap">
+    <div class="shelf" id="game-shelf">
+
+      <!-- Upload card always first -->
+      <div class="upload-card">
+        <div class="upload-zone" onclick="openUpload()" tabindex="0" title="Add ROM">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14M5 12l7-7 7 7"/>
+          </svg>
+          <div class="upload-zone-label">Add ROM</div>
+          <div class="upload-zone-sub">.gb .gbc .gba</div>
+        </div>
+        <div style="font-size:12px;color:var(--text3);text-align:center;">Upload a game</div>
+      </div>
+
+      <!-- Demo cards (visual only, launch upload to play real ROMs) -->
+      <div class="game-card" tabindex="0" onclick="demoLaunch(this)" data-system="GB" data-title="Tetris" data-emoji="🧱">
+        <div class="card-art theme-blue">
+          <span class="card-badge badge-gb">GB</span>
+          🧱
+          <div class="card-bottom">
+            <div class="card-title">Tetris</div>
+            <div class="card-meta">Nintendo · 1989</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card" tabindex="0" onclick="demoLaunch(this)" data-system="GBC" data-title="Pokémon Crystal" data-emoji="💎">
+        <div class="card-art theme-teal">
+          <span class="card-badge badge-gbc">GBC</span>
+          💎
+          <div class="card-bottom">
+            <div class="card-title">Pokémon Crystal</div>
+            <div class="card-meta">Game Freak · 2000</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card" tabindex="0" onclick="demoLaunch(this)" data-system="GBA" data-title="Metroid Fusion" data-emoji="🚀">
+        <div class="card-art theme-purple">
+          <span class="card-badge badge-gba">GBA</span>
+          🚀
+          <div class="card-bottom">
+            <div class="card-title">Metroid Fusion</div>
+            <div class="card-meta">Nintendo · 2002</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card" tabindex="0" onclick="demoLaunch(this)" data-system="GB" data-title="Kirby's Dream Land" data-emoji="⭐">
+        <div class="card-art theme-pink">
+          <span class="card-badge badge-gb">GB</span>
+          ⭐
+          <div class="card-bottom">
+            <div class="card-title">Kirby's Dream Land</div>
+            <div class="card-meta">HAL Lab · 1992</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card" tabindex="0" onclick="demoLaunch(this)" data-system="GBA" data-title="Castlevania" data-emoji="🏰">
+        <div class="card-art theme-dark">
+          <span class="card-badge badge-gba">GBA</span>
+          🏰
+          <div class="card-bottom">
+            <div class="card-title">Castlevania</div>
+            <div class="card-meta">Konami · 2001</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="game-card" tabindex="0" onclick="demoLaunch(this)" data-system="GBC" data-title="The Legend of Zelda" data-emoji="🗡️">
+        <div class="card-art theme-gold">
+          <span class="card-badge badge-gbc">GBC</span>
+          🗡️
+          <div class="card-bottom">
+            <div class="card-title">Zelda: Oracle of Ages</div>
+            <div class="card-meta">Capcom · 2001</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <div class="nav-dot active"></div>
+    <div class="nav-dot"></div>
+    <div class="nav-dot"></div>
+  </div>
+</div>
+
+<!-- ══════════ UPLOAD MODAL ══════════ -->
+<div id="upload-screen">
+  <div class="upload-modal">
+    <h2>Add a Game</h2>
+    <p>Upload a ROM file from your device.<br>Supports Game Boy, Game Boy Color,<br>and Game Boy Advance games.</p>
+    <div class="upload-drop" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div class="upload-drop-icon">📁</div>
+      <div class="upload-drop-text">Drop ROM here</div>
+      <div class="upload-drop-sub">.gb · .gbc · .gba</div>
+    </div>
+    <input type="file" id="file-input" accept=".gb,.gbc,.gba" onchange="handleFileUpload(this)">
+    <button class="upload-dismiss" onclick="closeUpload()">Cancel</button>
+  </div>
+</div>
+
+<!-- ══════════ EMULATOR SCREEN ══════════ -->
+<div id="emulator-screen">
+  <div class="emu-topbar">
+    <button class="emu-back" onclick="exitEmulator()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 12H5M12 5l-7 7 7 7"/>
+      </svg>
+      Home
+    </button>
+    <div class="emu-game-name" id="emu-game-name">—</div>
+    <div class="emu-status" id="emu-status">LOADING</div>
+  </div>
+  <div class="emu-container">
+    <div id="emulator"></div>
+  </div>
+</div>
+
+<script>
+// ── Clock ──
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.getHours().toString().padStart(2,'0') + ':' +
+    now.getMinutes().toString().padStart(2,'0');
+}
+updateClock();
+setInterval(updateClock, 30000);
+
+// ── Library state ──
+let library = [];
+let heroIndex = 0;
+let currentFilter = 'all';
+
+// ── System tab filter ──
+function filterSystem(sys) {
+  currentFilter = sys;
+  document.querySelectorAll('.sys-tab').forEach(t => {
+    t.className = 'sys-tab';
+    if (t.dataset.filter === sys) {
+      if (sys === 'GB')  t.classList.add('active-gb');
+      else if (sys === 'GBC') t.classList.add('active-gbc');
+      else if (sys === 'GBA') t.classList.add('active-gba');
+      else t.classList.add('active-gb');
+    }
+  });
+
+  const cards = document.querySelectorAll('.game-card');
+  cards.forEach(c => {
+    const csys = c.dataset.system;
+    c.style.display = (sys === 'all' || csys === sys) ? '' : 'none';
+  });
+  document.getElementById('shelf-label').textContent = sys === 'all' ? 'All Games' : sys + ' Games';
+}
+
+// ── Hero ──
+const heroDefaults = [
+  { emoji: '🎮', title: 'PixelVault', subtitle: 'Upload a ROM to get started. Supports .gb .gbc .gba files.', label: 'Your Library', theme: 'theme-purple' }
+];
+function setHero(card) {
+  const title = card.dataset.title || 'Unknown';
+  const sys = card.dataset.system || 'GB';
+  const emoji = card.dataset.emoji || '🎮';
+  const artEl = card.querySelector('.card-art');
+  const themeClass = [...artEl.classList].find(c => c.startsWith('theme-')) || 'theme-dark';
+  document.getElementById('hero-art').className = 'hero-art ' + themeClass;
+  document.getElementById('hero-art').textContent = emoji;
+  document.getElementById('hero-label').textContent = 'Featured · ' + ({GB:'Game Boy',GBC:'Game Boy Color',GBA:'Game Boy Advance'}[sys] || sys);
+  document.getElementById('hero-title').textContent = title;
+  document.getElementById('hero-subtitle').textContent = 'Press play to launch this game in the emulator.';
+  document.getElementById('hero-play').dataset.card = '';
+  document.getElementById('hero-play').onclick = () => {
+    // re-trigger card launch
+    if (card.dataset.romUrl) {
+      launchROM(card.dataset.romUrl, card.dataset.system, card.dataset.title);
+    } else {
+      demoLaunch(card);
+    }
+  };
+}
+
+// ── Upload ──
+function openUpload() {
+  document.getElementById('upload-screen').classList.add('active');
+}
+function closeUpload() {
+  document.getElementById('upload-screen').classList.remove('active');
+}
+
+// Drag & drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+
+function handleFileUpload(input) {
+  if (input.files[0]) processFile(input.files[0]);
+}
+
+function processFile(file) {
+  const name = file.name.replace(/\.[^.]+$/, '');
+  const ext = file.name.split('.').pop().toLowerCase();
+  const sysMap = { gb: 'GB', gbc: 'GBC', gba: 'GBA' };
+  const sys = sysMap[ext] || 'GB';
+  const url = URL.createObjectURL(file);
+  addGameCard(name, sys, url, '🎮');
+  closeUpload();
+  document.getElementById('file-input').value = '';
+}
+
+function addGameCard(title, system, romUrl, emoji) {
+  const shelf = document.getElementById('game-shelf');
+  const uploadCard = shelf.querySelector('.upload-card');
+  const themeMap = { GB: 'theme-blue', GBC: 'theme-teal', GBA: 'theme-purple' };
+  const badgeClass = `badge-${system.toLowerCase()}`;
+  const theme = themeMap[system] || 'theme-dark';
+  const div = document.createElement('div');
+  div.className = 'game-card';
+  div.tabIndex = 0;
+  div.dataset.system = system;
+  div.dataset.title = title;
+  div.dataset.emoji = emoji;
+  div.dataset.romUrl = romUrl;
+  div.style.animationDelay = '0s';
+  div.innerHTML = `
+    <div class="card-art ${theme}">
+      <span class="card-badge badge-${system.toLowerCase()}">${system}</span>
+      ${emoji}
+      <div class="card-bottom">
+        <div class="card-title">${title}</div>
+        <div class="card-meta">Your Library</div>
+      </div>
+    </div>`;
+  div.onclick = () => launchROM(romUrl, system, title);
+  div.onmouseenter = () => setHero(div);
+  shelf.insertBefore(div, uploadCard.nextSibling);
+  setHero(div);
+}
+
+// ── Demo launch (no actual ROM) ──
+function demoLaunch(card) {
+  setHero(card);
+  const title = card.dataset.title;
+  showDemoMessage(title);
+}
+
+function showDemoMessage(title) {
+  const sys = document.querySelector('.game-card[data-title="' + title + '"]')?.dataset.system || 'GB';
+  document.getElementById('home-screen').classList.add('hidden');
+  document.getElementById('emulator-screen').classList.add('active');
+  document.getElementById('emu-game-name').textContent = title;
+  document.getElementById('emu-status').textContent = 'DEMO MODE';
+  document.getElementById('emulator').innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:24px;text-align:center;padding:40px;">
+      <div style="font-size:72px;animation:heroFloat 3s ease-in-out infinite;">🎮</div>
+      <div style="font-family:'Space Mono',monospace;font-size:11px;color:#555568;letter-spacing:0.15em;text-transform:uppercase;">No ROM loaded</div>
+      <div style="font-size:24px;font-weight:700;color:#f0f0fa;">${title}</div>
+      <div style="font-size:15px;color:#8888aa;line-height:1.7;max-width:380px;">
+        This is a demo placeholder.<br>
+        To actually play, upload a <strong style="color:#a78bfa;">.${sys.toLowerCase()}</strong> ROM file using the <strong style="color:#a78bfa;">+ Add ROM</strong> button on the home screen.
+      </div>
+      <div style="font-size:12px;color:#444455;margin-top:8px;line-height:1.6;">
+        ROM files are not included for legal reasons.<br>
+        Only use ROMs for games you own.
+      </div>
+    </div>`;
+}
+
+function heroPlay() {
+  // play first card if available
+  const first = document.querySelector('.game-card');
+  if (first && first.dataset.romUrl) {
+    launchROM(first.dataset.romUrl, first.dataset.system, first.dataset.title);
+  } else if (first) {
+    demoLaunch(first);
+  } else {
+    openUpload();
+  }
+}
+
+// ── Actual ROM launch via EmulatorJS ──
+function launchROM(romUrl, system, title) {
+  document.getElementById('home-screen').classList.add('hidden');
+  document.getElementById('emulator-screen').classList.add('active');
+  document.getElementById('emu-game-name').textContent = title;
+  document.getElementById('emu-status').textContent = 'LOADING';
+
+  const coreMap = { GB: 'gb', GBC: 'gb', GBA: 'gba' };
+  const core = coreMap[system] || 'gb';
+
+  const container = document.getElementById('emulator');
+  container.innerHTML = '';
+
+  // Clear any stale EJS globals from a previous session
+  Object.keys(window).filter(k => k.startsWith('EJS_')).forEach(k => { try { delete window[k]; } catch(e) {} });
+
+  // EmulatorJS config
+  window.EJS_player = '#emulator';
+  window.EJS_core = core;
+  window.EJS_gameUrl = romUrl;
+  window.EJS_gameName = title;
+  window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+  window.EJS_startOnLoaded = true;
+  window.EJS_color = '#a78bfa';
+  window.EJS_backgroundColor = '#000000';
+
+  // Size the emulator div explicitly
+  const container = document.getElementById('emulator');
+  container.style.cssText = 'width:100%;height:100%;';
+
+  // Remove any old EmulatorJS script and style
+  document.querySelectorAll('#ejs-loader, #ejs-style').forEach(el => el.remove());
+
+  const script = document.createElement('script');
+  script.id = 'ejs-loader';
+  script.src = 'https://cdn.emulatorjs.org/stable/data/loader.js';
+  script.onload = () => {
+    document.getElementById('emu-status').textContent = 'RUNNING';
+  };
+  script.onerror = () => {
+    document.getElementById('emu-status').textContent = 'ERROR';
+    container.innerHTML = `
+      <div style="color:#f87171;text-align:center;padding:60px;font-size:15px;line-height:1.8;">
+        ⚠️ Could not load EmulatorJS.<br>
+        Check your internet connection and try again.<br>
+        <span style="color:#555568;font-size:13px;">Emulator provided by emulatorjs.org</span>
+      </div>`;
+  };
+  document.body.appendChild(script);
+}
+
+// ── Exit emulator ──
+function exitEmulator() {
+  document.getElementById('emulator-screen').classList.remove('active');
+  document.getElementById('home-screen').classList.remove('hidden');
+  // Clean up emulator
+  document.getElementById('emulator').innerHTML = '';
+  document.querySelectorAll('#ejs-loader, #ejs-style').forEach(el => el.remove());
+  Object.keys(window).filter(k => k.startsWith('EJS_')).forEach(k => { try { delete window[k]; } catch(e) {} });
+  document.getElementById('emu-status').textContent = 'LOADING';
+}
+
+// ── Card hover hero ──
+document.querySelectorAll('.game-card').forEach(card => {
+  card.addEventListener('mouseenter', () => setHero(card));
+});
+
+// ── Keyboard shelf scroll ──
+document.getElementById('game-shelf').addEventListener('keydown', e => {
+  if (e.key === 'Enter') e.target.click();
+});
+</script>
+</body>
+</html>
